@@ -61,6 +61,10 @@ class WifiUci:
             return []  # no wifi sections -> no gest wifi is running -> we're done
 
     @staticmethod
+    def scan_device(device_name):
+        return WifiUci.call_ubus("iwinfo", "scan", {"device": device_name})
+
+    @staticmethod
     def set_guest_wifi_disabled(backend):
         """ Should disable all guest wifi networks
         :param backend: backend controller instance

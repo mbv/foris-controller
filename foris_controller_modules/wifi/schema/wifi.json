@@ -411,6 +411,31 @@
                     "required": ["id", "enabled"]
                 }
             ]
+        },
+        "wifi_master_encryption": {
+            "type": "object",
+            "description": "available master wifi ecryption",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "wpa": {
+                    "type": "array",
+                    "items":{
+                        "type":"integer", "minimum":1, "maximum":2
+                    }
+                },
+                "authentication": {
+                    "type": "array",
+                    "items": {
+                        "enum": ["psk"]
+                    }
+                },
+                "ciphers": {
+                    "type": "array",
+                    "items": {
+                        "enum": ["tkip", "ccmp"]
+                    }
+                }
+            }
         }
     },
     "oneOf": [
@@ -537,6 +562,56 @@
                 "action": {"enum": ["reset"]}
             },
             "additionalProperties": false
+        },
+        {
+            "description": "request to scan avaialable networks",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["scan_device"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "device_name": {"type": "string"}
+                    },
+                    "required": ["device_name"],
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "reply with available networks",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["scan_device"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "description": "available wifi service",
+                                "properties": {
+                                    "ssid": {"type": "string", "minLength": 1, "maxLength": 32},
+                                    "bssid": {"type": "string", "format": "macaddress"},
+                                    "mode": {"enum": ["Master", "Client"]},
+                                    "channel": {"type": "integer", "minimum": 1},
+                                    "encryption": {"$ref": "#/definitions/wifi_master_encryption"}
+
+                                },
+                                "requiredProperties": ["ssid", "bssid", "mode", "channel", "encryption"]
+                            }
+                        }
+                    },
+                    "required": ["results"],
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
         }
     ]
 }

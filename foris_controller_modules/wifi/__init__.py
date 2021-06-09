@@ -59,7 +59,14 @@ class WifiModule(BaseModule):
             self.notify("reset")
         return {"result": res}
 
+    def action_scan_device(self, data):
+        """ Scan device for available wifi networks.
+        :param data: {"device_name": "radio#"}.
+        :rtype: dict """
+        res = self.handler.scan_device(data)
+        return res
 
-@wrap_required_functions(["get_settings", "update_settings", "reset"])
+
+@wrap_required_functions(["get_settings", "update_settings", "reset", "scan_device"])
 class Handler(object):
     pass

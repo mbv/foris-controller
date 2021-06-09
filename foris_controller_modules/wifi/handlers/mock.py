@@ -159,6 +159,55 @@ DEFAULT_CONFIG = [
     },
 ]
 
+_WIFI_NETWORKS = {
+    "results": [
+        {
+            "ssid": "Turris",
+            "bssid": "20:89:84:32:3A:6D",
+            "mode": "Master",
+            "channel": 11,
+            "signal": -55,
+            "quality": 55,
+            "quality_max": 70,
+            "encryption": {
+                "enabled": True,
+                "wpa": [
+                    2
+                ],
+                "authentication": [
+                    "psk"
+                ],
+                "ciphers": [
+                    "tkip",
+                    "ccmp"
+                ]
+            }
+        },
+        {
+            "ssid": "Turris5G",
+            "bssid": "BE:30:7D:31:7F:A3",
+            "mode": "Master",
+            "channel": 36,
+            "signal": -66,
+            "quality": 44,
+            "quality_max": 70,
+            "encryption": {
+                "enabled": True,
+                "wpa": [
+                    2
+                ],
+                "authentication": [
+                    "psk"
+                ],
+                "ciphers": [
+                    "tkip",
+                    "ccmp"
+                ]
+            }
+        }
+    ]
+}
+
 
 class MockWifiHandler(Handler, BaseMockHandler):
     devices = copy.deepcopy(DEFAULT_CONFIG)
@@ -260,3 +309,8 @@ class MockWifiHandler(Handler, BaseMockHandler):
         """
         MockWifiHandler.devices = copy.deepcopy(DEFAULT_CONFIG)
         return True
+
+    @logger_wrapper(logger)
+    def scan_device(self, data):
+        """ Mocks return data fom wifi-scan. """
+        return _WIFI_NETWORKS

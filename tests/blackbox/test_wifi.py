@@ -1901,3 +1901,15 @@ def test_update_80211w_openwrt(uci_configs_init, infrastructure, network_restart
 
     assert uci.get_option_named(uci_data, "wireless", "default_radio0", "encryption", "") == "sae-mixed"
     assert uci.get_option_named(uci_data, "wireless", "default_radio0", "ieee80211w", "") == "0"
+
+
+@pytest.mark.only_backends(["mock"])
+def test_scan_networks(infrastructure):
+    res = infrastructure.process_message(
+        {"action": "scan_device", "kind": "request", "module": "wifi", "data": {"device_name": "radio0"}}
+    )
+    assert "errors" not in res.keys()
+    assert match_subdict(
+        {'ssid': 'Turris', 'bssid': '20:89:84:32:3A:6D', 'mode': 'Master', 'channel': 11, 'signal': -55, 'quality': 55, 'quality_max': 70},
+        res["data"]["results"][0]
+    )

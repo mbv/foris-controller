@@ -60,3 +60,8 @@ class OpenwrtWifiHandler(Handler, BaseOpenwrtHandler):
         :rtype: bool
         """
         return self.cmds.reset()
+
+    @logger_wrapper(logger)
+    def scan_device(self, data):
+        """ Scans wifi device for networks """
+        return WifiUci.scan_device(**data)
