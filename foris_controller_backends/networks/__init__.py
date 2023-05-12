@@ -377,7 +377,23 @@ class NetworksUci():
         # hide code below to separate function?
         for record in wifi_ifaces:
             networks_and_ssids = self._find_enabled_wireless_networks(wireless_data, record)
-            if not networks_and_ssids:
+
+            # Stopgap measure for yet unsupported pci slot_path, which is
+            # already present in data provided by turrishw >= 0.11.0.
+            # NOTE: Drop this little hack, once the issue #252 will be properly implemented.
+            if "slot_path" in record:
+                del record["slot_path"]
+
+            for network, ssid in networks_and_ssids:
+                record["ssid"] = ssid
+                if network == "lan":
+                    lan_network.append(record)
+                elif network == "guest_turris":
+                    guest_network.append(record)
+                elif network == "wan":
+                    wan_network.append(record)
+
+            if len(networks_and_ssids) == 0:
                 record["ssid"] = ""
                 none_network.append(record)
 
