@@ -1,6 +1,6 @@
 #
 # foris-controller
-# Copyright (C) 2018-2021, 2023 CZ.NIC, z.s.p.o. (https://www.nic.cz/)
+# Copyright (C) 2018-2023 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -125,8 +125,9 @@ class MockNetworksHandler(Handler, BaseMockHandler):
                 "link_speed": 0,
                 "bus": "pci",
                 "module_id": 0,
-                "configurable": True,
-                "macaddr": "04:f0:21:24:11:1b"
+                "configurable": False,
+                "macaddr": "04:f0:21:24:11:1b",
+                "qmi_device": "/dev/cdc-wdm0"
             },
             {
                 "id": "wwan1",
@@ -136,8 +137,9 @@ class MockNetworksHandler(Handler, BaseMockHandler):
                 "link_speed": 0,
                 "bus": "pci",
                 "module_id": 0,
-                "configurable": True,
-                "macaddr": "04:f0:21:24:11:be"
+                "configurable": False,
+                "macaddr": "04:f0:21:24:11:be",
+                "qmi_device": "/dev/cdc-wdm1"
             },
             {
                 "id": "wlan0",
