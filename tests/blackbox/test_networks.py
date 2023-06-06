@@ -29,6 +29,8 @@ from foris_controller_testtools.utils import (
     prepare_turrishw_root,
 )
 
+from .helpers.common import query_infrastructure
+
 
 @pytest.mark.parametrize(
     "device,turris_os_version", [("omnia", "4.0"), ("mox", "4.0"), ("turris", "6.0")], indirect=True
@@ -801,6 +803,56 @@ config wifi-iface 'guest_iface_0'
 
     assert len([e["id"] for e in res["data"]["networks"]["none"] if e["type"] == "wifi"]) == 1
     assert len([e["id"] for e in res["data"]["networks"]["lan"] if e["type"] == "wifi"]) == 0
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("omnia", "7.0"), ("turris", "7.0")], indirect=True)
+def test_get_settings_non_configurable_wifi_interfaces(infrastructure, device, turris_os_version):
+    """Test that wifi interfaces should not be configurable, i.e. will have flag 'configurable' set to False.
+
+    Configurable in this context means that they should not be managed on reforis 'Interfaces' page.
+    """
+    if infrastructure.backend_name in ["openwrt"]:
+        prepare_turrishw_root(device, turris_os_version)
+
+    res = query_infrastructure(
+        infrastructure,
+        {"module": "networks", "action": "get_settings", "kind": "request"}
+    )
+
+    wifi_ifaces = (
+        [e for e in res["data"]["networks"]["lan"] if e["type"] == "wifi"]
+        + [e for e in res["data"]["networks"]["guest"] if e["type"] == "wifi"]
+        + [e for e in res["data"]["networks"]["none"] if e["type"] == "wifi"]
+    )
+
+    assert len(wifi_ifaces) >= 1
+    for iface in wifi_ifaces:
+        assert iface["configurable"] is False
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("mox", "7.0"), ("turris", "7.0")], indirect=True)
+def test_get_settings_non_configurable_wwan_interfaces(infrastructure, device, turris_os_version):
+    """Test that wwan interfaces should not be configurable, i.e. will have flag 'configurable' set to False.
+
+    Configurable in this context means that they should not be managed on reforis 'Interfaces' page.
+    """
+    if infrastructure.backend_name in ["openwrt"]:
+        prepare_turrishw(f"{device}-wwan-{turris_os_version}")
+
+    res = query_infrastructure(
+        infrastructure,
+        {"module": "networks", "action": "get_settings", "kind": "request"}
+    )
+
+    wwan_ifaces = (
+        [e for e in res["data"]["networks"]["lan"] if e["type"] == "wwan"]
+        + [e for e in res["data"]["networks"]["guest"] if e["type"] == "wwan"]
+        + [e for e in res["data"]["networks"]["none"] if e["type"] == "wwan"]
+    )
+
+    assert len(wwan_ifaces) >= 1
+    for iface in wwan_ifaces:
+        assert iface["configurable"] is False
 
 
 def test_network_change_notification(uci_configs_init, infrastructure, notify_api):

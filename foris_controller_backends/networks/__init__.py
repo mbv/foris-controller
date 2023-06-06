@@ -251,9 +251,16 @@ class NetworksUci():
         try:
             for k, v in interfaces.items():
                 v["id"] = k
-                v["configurable"] = True
-                if v["type"] == "wifi":
+
+                if v["type"] in ("wifi", "wwan"):
+                    # Hint to consumer of data, that these interfaces should not be managed by simple means,
+                    # e.g. in reforis "Interfaces" page.
+                    # Configuration of these interfaces should be made by separate API calls.
                     v["configurable"] = False
+                else:
+                    v["configurable"] = True
+
+                if v["type"] == "wifi":
                     res_wireless.append(v)
                 else:
                     res.append(v)
