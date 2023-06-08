@@ -1,6 +1,6 @@
 #
 # foris-controller
-# Copyright (C) 2017 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
+# Copyright (C) 2017, 2023 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,20 +21,23 @@ import json
 import logging
 import multiprocessing
 import os
-import prctl
 import random
 import re
 import signal
 import subprocess
 import threading
-
-from tempfile import TemporaryFile
+import typing
 from collections import OrderedDict
+from tempfile import TemporaryFile
+
+import prctl
 
 from foris_controller.app import app_info
-from foris_controller.exceptions import BackendCommandFailed, FailedToParseCommandOutput
+from foris_controller.exceptions import (
+    BackendCommandFailed,
+    FailedToParseCommandOutput,
+)
 from foris_controller.utils import RWLock, make_multiprocessing_manager
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,7 @@ def handle_command(*args, **kwargs):
     with TemporaryFile() as stdout, TemporaryFile() as stderr:
         popen_kwargs = {}
         input_data = kwargs.pop("input_data", None)
+        proc_timeout = kwargs.get("timeout")
 
         popen_kwargs["stderr"] = stderr
         popen_kwargs["stdout"] = stdout
@@ -75,9 +79,14 @@ def handle_command(*args, **kwargs):
 
         process = subprocess.Popen(args, **popen_kwargs)
 
-        if input_data:
-            process.communicate(input_data)
-        else:
+        try:
+            if input_data:
+                process.communicate(input_data, timeout=proc_timeout)
+            else:
+                process.communicate(timeout=proc_timeout)
+        except subprocess.TimeoutExpired:
+            logger.error(f"Process failed to finish in time limit {proc_timeout} seconds.")
+            process.kill()
             process.communicate()
 
         stdout.seek(0)
@@ -133,19 +142,21 @@ class BaseCmdLine(object):
         return retval, stdout, stderr
 
     @staticmethod
-    def _run_command_and_check_retval(args, expected_retval):
+    def _run_command_and_check_retval(args, expected_retval, timeout: typing.Optional[float] = None):
         """ Runs command and checks its retval.
 
         :param args: cmd and its arguments
         :type args: tuple
         :param expected_retval: expected retval
         :type expected_retval: int
+        :param timeout: optional timeout
+        :type timeout: float or None
 
         :returns: (stdout, stderr)
         :rtype: (str, str)
         :raises: BackendCommandFailed
         """
-        retval, stdout, stderr = BaseCmdLine._run_command(*args)
+        retval, stdout, stderr = BaseCmdLine._run_command(*args, timeout=timeout)
         if not retval == expected_retval:
             logger.error(
                 "Command %s unexpected returncode (%d, expected %d)."
