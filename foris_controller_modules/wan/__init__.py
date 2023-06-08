@@ -19,8 +19,10 @@
 
 import logging
 
-from foris_controller.module_base import BaseModule
 from foris_controller.handler_base import wrap_required_functions
+from foris_controller.module_base import BaseModule
+
+from .datatypes import WanOperationModes
 
 
 class WanModule(BaseModule):
@@ -91,6 +93,13 @@ class WanModule(BaseModule):
         """
         return self.handler.get_wan_status()
 
+    def action_get_wan_mode(self, data) -> dict[str, WanOperationModes]:
+        """ Obtain info regarding which wan operation mode is currently used.
+
+        Wired (copper or fiber) or Wireless (LTE/QMI) are supported at the moment.
+        """
+        return {"mode": self.handler.get_wan_mode()}
+
 
 @wrap_required_functions(
     [
@@ -99,7 +108,8 @@ class WanModule(BaseModule):
         "connection_test_trigger",
         "connection_test_status",
         "get_wan_status",
+        "get_wan_mode",
     ]
 )
-class Handler(object):
+class Handler():
     pass

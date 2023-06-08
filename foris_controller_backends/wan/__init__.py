@@ -18,8 +18,14 @@
 #
 
 import logging
+import re
+import typing
 
-from foris_controller.exceptions import GenericError, UciException
+from foris_controller.exceptions import (
+    GenericError,
+    UciException,
+    UciRecordNotFound,
+)
 from foris_controller.utils import parse_to_list, unwrap_list
 from foris_controller_backends.cmdline import AsyncCommand, BaseCmdLine
 from foris_controller_backends.files import BaseFile
@@ -28,10 +34,12 @@ from foris_controller_backends.networks import NetworksCmd, NetworksUci
 from foris_controller_backends.uci import (
     UciBackend,
     get_option_named,
+    get_sections_by_type,
     parse_bool,
     section_exists,
     store_bool,
 )
+from foris_controller_modules.wan.datatypes import WanOperationModes
 
 logger = logging.getLogger(__name__)
 
@@ -440,6 +448,57 @@ class WanUci:
             )
             return True
         return False
+
+    @staticmethod
+    def _get_uci_firewall_wan_zone_section_name(firewall_data: dict) -> str:
+        """Try to find config section name for firewall zone 'wan'.
+
+        OpenWrt 'base' firewall zones (wan, lan, ...) are anonymous sections,
+        therefore it is needed to get the config section hash as its name.
+
+        Raise UciRecordNotFound if wan firewall zone doesn't exist.
+        """
+        fw_zones = get_sections_by_type(firewall_data, "firewall", "zone")
+
+        config_section_name = None
+        for zone in fw_zones:
+            if zone["data"]["name"] == "wan":
+                config_section_name = zone["name"]  # get anonymous section name (hash of the section)
+                break
+
+        if not config_section_name:
+            logger.error("Could not find firewall zone 'wan' in firewall config. Please check the config.")
+            raise UciRecordNotFound(config="firewall", section_type="zone")
+
+        return config_section_name
+
+    @staticmethod
+    def get_wan_mode() -> WanOperationModes:
+        """Get the current wan mode - i.e. which type of connection is currently used (wired vs wireless).
+
+        Fallback to 'wired' in case that unexpected values are detected.
+        """
+        DEFAULT_MODE: typing.Final = "wired"
+
+        wan_ifaces = WanUci.get_active_wan_interfaces()
+        # utilize set to ignore order of interfaces in list
+        if set(wan_ifaces) == {"wan", "wan6"}:
+            return "wired"
+        elif len(wan_ifaces) == 1:
+            # only 'wwanX' is considered as QMI wan
+            m = re.match(r"wwan(\d+)$", wan_ifaces[0])
+            return "wireless" if m else DEFAULT_MODE
+        else:
+            return DEFAULT_MODE  # fallback to "wired" in case of unexpected configuration
+
+    @staticmethod
+    def get_active_wan_interfaces() -> list[str]:
+        """Fetch interfaces that acts as WAN, based on the 'wan' firewall zone."""
+        with UciBackend() as backend:
+            firewall_data = backend.read("firewall")
+
+        wan_zone_cfg_name = WanUci._get_uci_firewall_wan_zone_section_name(firewall_data)
+        return get_option_named(firewall_data, "firewall", wan_zone_cfg_name, "network", default=[])
 
 
 class WanTestCommands(AsyncCommand):

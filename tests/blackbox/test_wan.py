@@ -18,6 +18,7 @@
 #
 
 import os
+from pathlib import Path
 
 import pytest
 from foris_controller_testtools.fixtures import UCI_CONFIG_DIR_PATH
@@ -30,7 +31,7 @@ from foris_controller_testtools.utils import (
 
 from .helpers.common import get_uci_backend_data, query_infrastructure
 
-FILE_ROOT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_wan_files")
+FILE_ROOT_PATH = Path(__file__).resolve().parent / "test_wan_files"
 
 
 @pytest.mark.parametrize("device,turris_os_version", [("mox", "6.0"),("omnia", "6.0")], indirect=True)
@@ -2028,3 +2029,99 @@ def test_update_settings_vlan_openwrt(
     )
     assert uci.get_option_named(data, "network", "wan", "device", "") == "eth2"
     assert uci.get_option_named(data, "network", "dev_wan", "name", "") == "eth2"
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
+def test_get_wan_mode(infrastructure, uci_configs_init, device, turris_os_version):
+    """Test that we can get either 'wired' or 'wireless'."""
+    res = query_infrastructure(
+        infrastructure,
+        {"module": "wan", "action": "get_wan_mode", "kind": "request"}
+    )
+    assert "mode" in res["data"].keys()
+    assert res["data"]["mode"] in ("wired", "wireless")
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
+@pytest.mark.only_backends(["openwrt"])
+def test_get_wan_mode_openwrt(infrastructure, uci_configs_init, device, turris_os_version):
+    """Test more specific wan mode configs and results.
+
+    Currently there are two mutually exclusive variations:
+    * wired uplink: wan + wan6
+    * wireless uplink: wwan
+
+    Check following scenarios:
+    * (1) Wired uplink should return 'wired'
+    * (1a) Wired uplink, but in reverse order in uci config
+    * (2) Wireless (LTE) uplink should return 'wireless'
+    * (3) Unexpected mix of uplinks (for instance: wan + wan6 + wwan) should return 'wired' (fallback)
+    * (4) No uplink specified => 'wired' (fallback)
+    """
+    def get(expected_mode: str):
+        res = query_infrastructure(
+            infrastructure,
+            {"module": "wan", "action": "get_wan_mode", "kind": "request"}
+        )
+        assert "mode" in res["data"].keys()
+        assert res["data"]["mode"] == expected_mode
+
+    uci = get_uci_module(infrastructure.name)
+
+    # Let's assume that zone 'wan' is always the second zone in mock config
+    wan_zone_name = "@zone[1]"
+
+    # (1) prepared wired config
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wan", "wan6"])
+    get(expected_mode="wired")
+
+    # (1a) wired, but reversed order
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wan6", "wan"])
+    get(expected_mode="wired")
+
+    # (2) Wireless
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wwan0"])
+    get(expected_mode="wireless")
+
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wwan1"])
+    get(expected_mode="wireless")
+
+    # (3) Mix -> fallback to default
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wan", "wan6", "wwan"])
+    get(expected_mode="wired")
+
+    # we do not consider just "wwan" without number as expected wan, fallback to default
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.replace_list("firewall", wan_zone_name, "network", ["wwan"])
+    get(expected_mode="wired")
+
+    # (4) No uplink specified -> Fallback to default
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.del_from_list("firewall", wan_zone_name, "network")  # clear the 'network' list
+    get(expected_mode="wired")
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
+@pytest.mark.only_backends(["openwrt"])
+def test_get_wan_mode_missing_wan_firewall_zone_openwrt(infrastructure, uci_configs_init, device, turris_os_version):
+    """Test that we should not get valid response in case the 'wan' firewall zone is missing.
+
+    Missing firewall zone for 'wan' is a quite unusual scenario for router, so consider it as critical error
+    and scenario that should not happen under normal circumstances.
+    """
+    uci = get_uci_module(infrastructure.name)
+
+    with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
+        backend.del_section("firewall", "@zone[1]")
+
+    res = query_infrastructure(
+        infrastructure,
+        {"module": "wan", "action": "get_wan_mode", "kind": "request"},
+        expect_success=False
+    )
+    assert "UciRecordNotFound" in res["errors"][0]["description"]

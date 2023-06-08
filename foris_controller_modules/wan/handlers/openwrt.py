@@ -21,9 +21,14 @@ import logging
 
 from foris_controller.handler_base import BaseOpenwrtHandler
 from foris_controller.utils import logger_wrapper
-from foris_controller_backends.wan import WanUci, WanTestCommands, WanStatusCommands
+from foris_controller_backends.wan import (
+    WanStatusCommands,
+    WanTestCommands,
+    WanUci,
+)
 
 from .. import Handler
+from ..datatypes import WanOperationModes
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +98,11 @@ class OpenwrtWanHandler(Handler, BaseOpenwrtHandler):
         """
         status = self.status_cmds.get_status()
         return {"up": status["up"], "last_seen_duid": status["duid"], "proto": status["proto"]}
+
+    @logger_wrapper(logger)
+    def get_wan_mode(self) -> WanOperationModes:
+        """ Obtain info regarding which wan operation mode is currently used.
+
+        Wired (copper or fiber) or Wireless (LTE/QMI) are supported at the moment.
+        """
+        return self.uci.get_wan_mode()

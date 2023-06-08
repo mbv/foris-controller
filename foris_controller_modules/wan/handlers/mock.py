@@ -1,6 +1,6 @@
 #
 # foris-controller
-# Copyright (C) 2018-2022 CZ.NIC, z.s.p.o. (https://www.nic.cz/)
+# Copyright (C) 2018-2023 CZ.NIC, z.s.p.o. (https://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ from foris_controller.handler_base import BaseMockHandler
 from foris_controller.utils import logger_wrapper
 
 from .. import Handler
+from ..datatypes import WanOperationModes
 
 logger = logging.getLogger(__name__)
 
@@ -253,3 +254,11 @@ class MockWanHandler(Handler, BaseMockHandler):
             "last_seen_duid": random.choice(["", "00030001d858d7004555"]),
             "proto": random.choice(["pppoe", "dhcp", "static", "none"]),
         }
+
+    @logger_wrapper(logger)
+    def get_wan_mode(self) -> WanOperationModes:
+        """ Mocks wan operation mode.
+
+        At the moment all Turris routers have ethernet port, therefore fall back to 'wired'.
+        """
+        return "wired"

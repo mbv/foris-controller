@@ -257,6 +257,33 @@
             "required": ["data"]
         },
         {
+            "description": "Request to get current active wan mode",
+            "properties": {
+                "module": {"enum": ["wan"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["get_wan_mode"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "Reply to get current active wan mode",
+            "properties": {
+                "module": {"enum": ["wan"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["get_wan_mode"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"enum": ["wired", "wireless"]}
+                    },
+                    "additionalProperties": false,
+                    "required": ["mode"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
             "description": "request to trigger connection test",
             "properties": {
                 "module": {"enum": ["wan"]},
