@@ -2032,6 +2032,42 @@ def test_update_settings_vlan_openwrt(
 
 
 @pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
+@pytest.mark.only_backends(["openwrt"])
+def test_update_settings_firewall_zone_openwrt(
+    uci_configs_init,
+    infrastructure,
+    device,
+    turris_os_version,
+    network_restart_command,
+):
+    """Test that updating wired wan settings will set the correct interfaces to firewall zone 'wan'."""
+    def update(data, expect_success=True):
+        query_infrastructure(
+            infrastructure,
+            {"module": "wan", "action": "update_settings", "kind": "request", "data": data},
+            expect_success
+        )
+
+        if expect_success:
+            assert network_restart_was_called([])
+
+        return get_uci_backend_data(uci)
+
+    uci = get_uci_module(infrastructure.name)
+    data = update(
+        {
+            "wan_settings": {"wan_type": "dhcp", "wan_dhcp": {}},
+            "wan6_settings": {"wan6_type": "none"},
+            "mac_settings": {"custom_mac_enabled": False},
+            "qos": {"enabled": False}
+        }
+    )
+
+    # assume that firewall zone 'wan' will always be the second anonymous zone in mock config
+    assert uci.get_option_anonymous(data, "firewall", "zone", 1, "network", "") == ["wan", "wan6"]
+
+
+@pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
 def test_get_wan_mode(infrastructure, uci_configs_init, device, turris_os_version):
     """Test that we can get either 'wired' or 'wireless'."""
     res = query_infrastructure(

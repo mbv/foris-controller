@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 class WanUci:
     _LNAME = "wan_limit_turris"
+    DEFAULT_WAN_INTERFACES = ("wan", "wan6")  # wired wan
 
     def get_settings(self):
         with UciBackend() as backend:
@@ -376,6 +377,10 @@ class WanUci:
                     backend.set_option("sqm", WanUci._LNAME, "enabled", store_bool(qos["enabled"]))
                 except UciException:
                     logger.error("Unable to create sqm record for WAN")
+
+            # switch uplink to wired wan
+            WanUci.set_wan_firewall_zone_interfaces(backend, WanUci.DEFAULT_WAN_INTERFACES)
+
         # update wizard passed in foris web (best effort)
         try:
             from foris_controller_backends.web import WebUciCommands
@@ -499,6 +504,22 @@ class WanUci:
 
         wan_zone_cfg_name = WanUci._get_uci_firewall_wan_zone_section_name(firewall_data)
         return get_option_named(firewall_data, "firewall", wan_zone_cfg_name, "network", default=[])
+
+    @staticmethod
+    def set_wan_firewall_zone_interfaces(backend: UciBackend, wan_interfaces: tuple[str, ...]) -> None:
+        """Set interfaces in 'wan' zone in firewall.
+
+        Replace existing list of 'wan' firewall zone interfaces in uci config.
+        Fallback to default wired interfaces ('wan', 'wan6') in case no target interfaces are provided.
+        """
+        if not wan_interfaces:
+            # always fallback to wired interfaces
+            wan_interfaces = WanUci.DEFAULT_WAN_INTERFACES
+
+        firewall_data = backend.read("firewall")
+        wan_zone_cfg_name = WanUci._get_uci_firewall_wan_zone_section_name(firewall_data)
+
+        backend.replace_list("firewall", wan_zone_cfg_name, "network", wan_interfaces)
 
 
 class WanTestCommands(AsyncCommand):
