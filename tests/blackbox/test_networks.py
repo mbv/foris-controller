@@ -184,7 +184,7 @@ def test_get_settings_interfaces_in_order_mixed_ifaces(
     "device,turris_os_version", [("omnia", "4.0"), ("mox", "4.0"), ("turris", "6.0")], indirect=True
 )
 def test_update_settings(
-    uci_configs_init, infrastructure, network_restart_command, device, turris_os_version,
+    uci_configs_init, infrastructure, fix_mox_wan, network_restart_command, device, turris_os_version,
 ):
     if infrastructure.backend_name in ["openwrt"]:
         prepare_turrishw_root(device, turris_os_version)
@@ -268,7 +268,7 @@ def test_update_settings(
     "device,turris_os_version", [("omnia", "4.0"), ("mox", "4.0"), ("turris", "6.0")], indirect=True
 )
 def test_update_settings_empty_wan(
-    uci_configs_init, infrastructure, network_restart_command, device, turris_os_version,
+    uci_configs_init, infrastructure, fix_mox_wan, network_restart_command, device, turris_os_version,
 ):
     if infrastructure.backend_name in ["openwrt"]:
         prepare_turrishw_root(device, turris_os_version)
@@ -406,7 +406,7 @@ def test_update_settings_more_wans(
 
 @pytest.mark.parametrize("device,turris_os_version", [("mox", "4.0")], indirect=True)
 def test_update_settings_missing_assign(
-    uci_configs_init, infrastructure, network_restart_command, device, turris_os_version,
+    uci_configs_init, infrastructure, fix_mox_wan, network_restart_command, device, turris_os_version,
 ):
     if infrastructure.backend_name in ["openwrt"]:
         prepare_turrishw_root(device, turris_os_version)
@@ -474,7 +474,7 @@ def test_update_settings_missing_assign(
 
 @pytest.mark.parametrize("device,turris_os_version", [("mox", "4.0"), ("turris", "6.0")], indirect=True)
 def test_update_settings_unknown_assign(
-    uci_configs_init, infrastructure, network_restart_command, device, turris_os_version,
+    uci_configs_init, infrastructure, fix_mox_wan, network_restart_command, device, turris_os_version,
 ):
     if infrastructure.backend_name in ["openwrt"]:
         prepare_turrishw_root(device, turris_os_version)
@@ -613,6 +613,7 @@ def test_update_settings_openwrt(
     uci_configs_init,
     init_script_result,
     infrastructure,
+    fix_mox_wan,
     network_restart_command,
     device,
     turris_os_version,
@@ -832,7 +833,7 @@ def test_get_settings_non_configurable_wifi_interfaces(infrastructure, device, t
 
 
 @pytest.mark.parametrize("device,turris_os_version", [("mox", "7.0"), ("turris", "7.0")], indirect=True)
-def test_get_settings_non_configurable_wwan_interfaces(infrastructure, device, turris_os_version):
+def test_get_settings_non_configurable_wwan_interfaces(infrastructure, fix_mox_wan, device, turris_os_version):
     """Test that wwan interfaces should not be configurable, i.e. will have flag 'configurable' set to False.
 
     Configurable in this context means that they should not be managed on reforis 'Interfaces' page.
@@ -888,6 +889,7 @@ def test_one_lan_does_not_break(
     uci_configs_init,
     init_script_result,
     infrastructure,
+    fix_mox_wan,
     network_restart_command,
     device,
     turris_os_version,
