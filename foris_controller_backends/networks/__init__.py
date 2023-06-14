@@ -107,6 +107,18 @@ class NetworksUci():
                 res.append(ports_map.pop(interface))
         return res
 
+    def _prepare_wan_network(self, data: dict, ports_map: dict[str, dict]) -> list[dict]:
+        """Find the active wan interface among detected interfaces.
+
+        Return type 'list' is not significant here when we expect only single string,
+        but is here mainly for compatibility with the rest of the network iterfaces data.
+        """
+        res = []
+
+        if active_wan_iface := NetworksWanUci.fetch_active_wan_device(data):
+            res.append(ports_map.pop(active_wan_iface))
+        return res
+
     @staticmethod
     def _get_anonymous_bridge_ports(uci_data: dict, section: str) -> typing.List[str]:
         """Get network bridges (lan, guest, ...) ports names of anonymous bridge config section.
@@ -362,14 +374,7 @@ class NetworksUci():
             except UciException:
                 wireless_data = {}  # wireless config missing
 
-        # prepare wired intefaces...
-        wan_network = self._prepare_network(network_data, "wan", iface_map)
-        # Return only first interface asigned to wan to make it compatible with bridges for wan,
-        # so the json message will still pass validation.
-        # Note: remove this little workaround when multiple interfaces on wan are supported
-        if wan_network:
-            wan_network = [wan_network[0]]
-
+        wan_network = self._prepare_wan_network(network_data, iface_map)
         lan_network = self._prepare_network(network_data, "lan", iface_map)
         guest_network = self._prepare_network(network_data, "guest_turris", iface_map)
         none_network = list(iface_map.values())  # reduced in _prepare_network using pop()

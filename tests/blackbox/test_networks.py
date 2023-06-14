@@ -56,6 +56,7 @@ def test_get_settings_more_wans(
     fix_mox_wan, infrastructure, device, turris_os_version
 ):
     """Check that even with multiple interfaces assigned to wan, only one is returned"""
+    prepare_turrishw_root(device, turris_os_version)
     uci = get_uci_module(infrastructure.name)
 
     with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:

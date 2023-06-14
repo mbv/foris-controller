@@ -26,6 +26,7 @@ from foris_controller_testtools.utils import (
     get_uci_module,
     match_subdict,
     network_restart_was_called,
+    prepare_turrishw,
     prepare_turrishw_root,
 )
 
@@ -1697,7 +1698,7 @@ def test_get_settings_missing_wireless(uci_configs_init, infrastructure, fix_mox
 
 @pytest.mark.parametrize("device, turris_os_version",[("mox", "4.0"),("omnia","4.0")], indirect=True)
 @pytest.mark.only_backends(["openwrt"])
-def test_wan6_options_can_be_empty(uci_configs_init, infrastructure, device, turris_os_version):
+def test_wan6_options_can_be_empty(uci_configs_init, infrastructure, fix_mox_wan, device, turris_os_version):
 
     prepare_turrishw_root(device, turris_os_version)
     uci = get_uci_module(infrastructure.name)
@@ -1856,7 +1857,7 @@ def test_get_settings_vlan_openwrt(infrastructure, network_restart_command, devi
     VLAN settings should be 'enabled' only when VLAN ID is set.
     VLAN settings should be 'disabled' without VLAN ID set.
     """
-    prepare_turrishw_root(device, turris_os_version)
+    prepare_turrishw(f"{device}-vlans-{turris_os_version}")
     uci = get_uci_module(infrastructure.name)
 
     # (1) no vlan id set
@@ -1869,14 +1870,14 @@ def test_get_settings_vlan_openwrt(infrastructure, network_restart_command, devi
 
     # (2) read vlan id
     with uci.UciBackend(UCI_CONFIG_DIR_PATH) as backend:
-        backend.set_option("network", "wan", "device", "eth2.200")
+        backend.set_option("network", "wan", "device", "eth2.100")
 
     res = query_infrastructure(
         infrastructure,
         {"module": "wan", "action": "get_settings", "kind": "request"},
     )
     assert "vlan_settings" in res["data"]
-    assert res["data"]["vlan_settings"] == {"enabled": True, "vlan_id": 200}
+    assert res["data"]["vlan_settings"] == {"enabled": True, "vlan_id": 100}
 
 
 @pytest.mark.parametrize("device,turris_os_version", [("omnia", "6.0")], indirect=True)
