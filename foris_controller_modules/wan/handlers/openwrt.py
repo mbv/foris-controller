@@ -21,6 +21,7 @@ import logging
 
 from foris_controller.handler_base import BaseOpenwrtHandler
 from foris_controller.utils import logger_wrapper
+from foris_controller_backends.networks import NetworksWanUci
 from foris_controller_backends.wan import (
     WanStatusCommands,
     WanTestCommands,
@@ -105,4 +106,4 @@ class OpenwrtWanHandler(Handler, BaseOpenwrtHandler):
 
         Wired (copper or fiber) or Wireless (LTE/QMI) are supported at the moment.
         """
-        return self.uci.get_wan_mode()
+        return NetworksWanUci.get_wan_mode()
