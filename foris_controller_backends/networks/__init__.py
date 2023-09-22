@@ -58,6 +58,7 @@ def decorate_guest_net(pos):
         return wrapper
     return decorate
 
+WIRED_WAN_INTERFACES = ("wan", "wan6")
 
 class NetworksUci():
     def _prepare_network(self, data: dict, section: str, ports_map: typing.Dict[str, dict]) -> typing.List[dict]:
@@ -364,7 +365,7 @@ class NetworksUci():
         """
 
         ifaces, wifi_ifaces = self.detect_interfaces()
-        iface_map = {e["id"]: e for e in ifaces}
+        iface_map = {e["id"]: e for e in typing.cast(typing.Iterable[dict],ifaces)}
 
         with UciBackend() as backend:
             network_data = backend.read("network")
@@ -395,8 +396,7 @@ class NetworksUci():
             # Stopgap measure for yet unsupported pci slot_path, which is
             # already present in data provided by turrishw >= 0.11.0.
             # NOTE: Drop this little hack, once the issue #252 will be properly implemented.
-            if "slot_path" in record:
-                del record["slot_path"]
+            record.pop("slot_path", None)
 
             for network, ssid in networks_and_ssids:
                 record["ssid"] = ssid
@@ -575,18 +575,12 @@ class NetworksWanUci():
 
         Fallback to 'wired' in case that unexpected values are detected.
         """
-        DEFAULT_MODE: typing.Final = "wired"
+        DEFAULT_MODE = WanOperationModes.WIRED
 
         wan_ifaces = NetworksWanUci._get_active_wan_interfaces_from_uci()
-        # utilize set to ignore order of interfaces in list
-        if set(wan_ifaces) == {"wan", "wan6"}:
-            return "wired"
-        elif len(wan_ifaces) == 1:
-            # only 'wwanX' is considered as QMI wan
-            m = re.match(r"wwan(\d+)$", wan_ifaces[0])
-            return "wireless" if m else DEFAULT_MODE
-        else:
-            return DEFAULT_MODE  # fallback to "wired" in case of unexpected configuration
+
+        return WanOperationModes.WIRELESS if len(wan_ifaces) == 1 and re.match(r"wwan(\d+)$", wan_ifaces[0]) else DEFAULT_MODE
+
 
     @staticmethod
     def is_designated_as_wan(if_name: str) -> bool:
@@ -620,7 +614,7 @@ class NetworksWanUci():
         """
         if not wan_interfaces:
             # always fallback to wired interfaces
-            wan_interfaces = ("wan", "wan6")
+            wan_interfaces = WIRED_WAN_INTERFACES
 
         firewall_data = backend.read("firewall")
         wan_zone_cfg_name = NetworksWanUci._get_uci_firewall_wan_zone_section_name(firewall_data)

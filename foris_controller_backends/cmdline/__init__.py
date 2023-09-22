@@ -87,7 +87,6 @@ def handle_command(*args, **kwargs):
         except subprocess.TimeoutExpired:
             logger.error(f"Process failed to finish in time limit {proc_timeout} seconds.")
             process.kill()
-            process.communicate()
 
         stdout.seek(0)
         stdout = stdout.read()

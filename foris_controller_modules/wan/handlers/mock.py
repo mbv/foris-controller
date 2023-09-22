@@ -261,4 +261,4 @@ class MockWanHandler(Handler, BaseMockHandler):
 
         At the moment all Turris routers have ethernet port, therefore fall back to 'wired'.
         """
-        return "wired"
+        return WanOperationModes.WIRED
