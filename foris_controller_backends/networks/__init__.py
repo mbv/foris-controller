@@ -58,7 +58,9 @@ def decorate_guest_net(pos):
         return wrapper
     return decorate
 
+
 WIRED_WAN_INTERFACES = ("wan", "wan6")
+
 
 class NetworksUci():
     def _prepare_network(self, data: dict, section: str, ports_map: typing.Dict[str, dict]) -> typing.List[dict]:
@@ -398,15 +400,6 @@ class NetworksUci():
             # NOTE: Drop this little hack, once the issue #252 will be properly implemented.
             record.pop("slot_path", None)
 
-            for network, ssid in networks_and_ssids:
-                record["ssid"] = ssid
-                if network == "lan":
-                    lan_network.append(record)
-                elif network == "guest_turris":
-                    guest_network.append(record)
-                elif network == "wan":
-                    wan_network.append(record)
-
             if len(networks_and_ssids) == 0:
                 record["ssid"] = ""
                 none_network.append(record)
@@ -581,7 +574,6 @@ class NetworksWanUci():
 
         return WanOperationModes.WIRELESS if len(wan_ifaces) == 1 and re.match(r"wwan(\d+)$", wan_ifaces[0]) else DEFAULT_MODE
 
-
     @staticmethod
     def is_designated_as_wan(if_name: str) -> bool:
         """Check whether given interface is designated as WAN."""
@@ -652,13 +644,13 @@ class NetworksWanUci():
         the uplink device accordingly.
         """
         active_mode = NetworksWanUci.get_wan_mode()
-        if active_mode == "wired":
+        if active_mode == WanOperationModes.WIRED:
             if device := get_option_named(data, "network", "wan", "device", ""):
                 return device
             if ifname := get_option_named(data, "network", "wan", "ifname", ""):
                 # backward compatible for OpenWrt 19.07 (and older) syntax
                 return ifname
-        elif active_mode == "wireless":
+        elif active_mode == WanOperationModes.WIRELESS:
             wan_ifaces = NetworksWanUci._get_active_wan_interfaces_from_uci()
             if len(wan_ifaces) == 1:  # we expect only one wwan uplink active
                 if m := re.match(r"wwan(\d+)$", wan_ifaces[0]):

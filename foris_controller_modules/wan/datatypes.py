@@ -5,6 +5,7 @@
 
 from enum import Enum
 
+
 class WanOperationModes(Enum):
     WIRED = "wired"
     WIRELESS = "wireless"
