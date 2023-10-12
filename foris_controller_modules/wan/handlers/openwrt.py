@@ -101,9 +101,9 @@ class OpenwrtWanHandler(Handler, BaseOpenwrtHandler):
         return {"up": status["up"], "last_seen_duid": status["duid"], "proto": status["proto"]}
 
     @logger_wrapper(logger)
-    def get_wan_mode(self) -> str:
+    def get_wan_mode(self) -> WanOperationModes:
         """ Obtain info regarding which wan operation mode is currently used.
 
         Wired (copper or fiber) or Wireless (LTE/QMI) are supported at the moment.
         """
-        return str(NetworksWanUci.get_wan_mode())
+        return NetworksWanUci.get_wan_mode()
