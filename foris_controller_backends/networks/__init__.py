@@ -644,13 +644,13 @@ class NetworksWanUci():
         the uplink device accordingly.
         """
         active_mode = NetworksWanUci.get_wan_mode()
-        if active_mode == WanOperationModes.WIRED:
+        if active_mode == WanOperationModes.WIRED.value:
             if device := get_option_named(data, "network", "wan", "device", ""):
                 return device
             if ifname := get_option_named(data, "network", "wan", "ifname", ""):
                 # backward compatible for OpenWrt 19.07 (and older) syntax
                 return ifname
-        elif active_mode == WanOperationModes.WIRELESS:
+        elif active_mode == WanOperationModes.WIRELESS.value:
             wan_ifaces = NetworksWanUci._get_active_wan_interfaces_from_uci()
             if len(wan_ifaces) == 1:  # we expect only one wwan uplink active
                 if m := re.match(r"wwan(\d+)$", wan_ifaces[0]):
