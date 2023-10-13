@@ -11,7 +11,6 @@ import typing
 #     WIRED = "wired"
 #     WIRELESS = "wireless"
 
-
 WanOperationModesValue = typing.Literal["wired", "wireless"]
 
 WanOperationModes = Enum('', {
