@@ -39,7 +39,7 @@ from foris_controller_backends.uci import (
     section_exists,
     store_bool,
 )
-from foris_controller_modules.wan.datatypes import WanOperationModes
+from foris_controller_modules.wan.datatypes import WanOperationModes, WanOperationModesValue
 
 logger = logging.getLogger(__name__)
 
@@ -563,16 +563,16 @@ class NetworksWanUci():
     modules of foris-controller.
     """
     @staticmethod
-    def get_wan_mode() -> WanOperationModes:
+    def get_wan_mode() -> WanOperationModesValue:
         """Get the current wan mode - i.e. which type of connection is currently used (wired vs wireless).
 
         Fallback to 'wired' in case that unexpected values are detected.
         """
-        DEFAULT_MODE = WanOperationModes.WIRED
+        DEFAULT_MODE = WanOperationModes.WIRED.value
 
         wan_ifaces = NetworksWanUci._get_active_wan_interfaces_from_uci()
 
-        return WanOperationModes.WIRELESS if len(wan_ifaces) == 1 and re.match(r"wwan(\d+)$", wan_ifaces[0]) else DEFAULT_MODE
+        return WanOperationModes.WIRELESS.value if len(wan_ifaces) == 1 and re.match(r"wwan(\d+)$", wan_ifaces[0]) else DEFAULT_MODE
 
     @staticmethod
     def is_designated_as_wan(if_name: str) -> bool:

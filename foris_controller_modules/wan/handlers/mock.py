@@ -25,7 +25,7 @@ from foris_controller.handler_base import BaseMockHandler
 from foris_controller.utils import logger_wrapper
 
 from .. import Handler
-from ..datatypes import WanOperationModes
+from ..datatypes import WanOperationModes, WanOperationModesValue
 
 logger = logging.getLogger(__name__)
 
@@ -256,9 +256,9 @@ class MockWanHandler(Handler, BaseMockHandler):
         }
 
     @logger_wrapper(logger)
-    def get_wan_mode(self) -> WanOperationModes:
+    def get_wan_mode(self) -> WanOperationModesValue:
         """ Mocks wan operation mode.
 
         At the moment all Turris routers have ethernet port, therefore fall back to 'wired'.
         """
-        return WanOperationModes.WIRED
+        return WanOperationModes.WIRED.value
