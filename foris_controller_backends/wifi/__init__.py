@@ -16,7 +16,7 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 #
-
+import json
 import logging
 import re
 import typing
@@ -27,7 +27,7 @@ from foris_controller.exceptions import (
     UciRecordNotFound,
 )
 from foris_controller.utils import sort_by_natural_order
-from foris_controller_backends.cmdline import BaseCmdLine
+from foris_controller_backends.cmdline import BaseCmdLine, AsyncCommand, AsyncMultipleCommands
 from foris_controller_backends.guest import GuestUci
 from foris_controller_backends.maintain import MaintainCommands
 from foris_controller_backends.ubus import UbusBackend
@@ -49,7 +49,7 @@ class WifiUci:
         "WPA2/3": "sae-mixed",
     }
     # reverse lookup of json schema values and uci config values
-    WIFI_ENC_UCI_TO_MODES = {v:k for k, v in WIFI_ENC_MODES_TO_UCI.items()}
+    WIFI_ENC_UCI_TO_MODES = {v: k for k, v in WIFI_ENC_MODES_TO_UCI.items()}
     WIFI_UCI_DEFAULT_ENC_MODE = "sae-mixed"
 
     @staticmethod
@@ -62,7 +62,7 @@ class WifiUci:
 
     @staticmethod
     def scan_device(device_name):
-        return WifiUci.call_ubus("iwinfo", "scan", {"device": device_name})
+        return UbusBackend.call_ubus("iwinfo", "scan", {"device": device_name})
 
     @staticmethod
     def set_guest_wifi_disabled(backend):
@@ -186,8 +186,8 @@ class WifiUci:
             return None
         device_id = int(device_no.group(1))
         enabled = not (
-            parse_bool(device["data"].get("disabled", "0"))
-            or parse_bool(interface["data"].get("disabled", "0"))
+                parse_bool(device["data"].get("disabled", "0"))
+                or parse_bool(interface["data"].get("disabled", "0"))
         )
         ssid = interface["data"].get("ssid", "Turris")
         hidden = parse_bool(interface["data"].get("hidden", "0"))
@@ -293,15 +293,15 @@ class WifiUci:
             e
             for e in get_sections_by_type(data, "wireless", "wifi-iface")
             if e["data"].get("device") == device_section["name"]
-            and (e["anonymous"] or not e["name"].startswith("guest_iface_"))
+               and (e["anonymous"] or not e["name"].startswith("guest_iface_"))
         ][0]
         # first non-anonymous section starting with 'guest_iface_' is guest wifi
         guest_interfaces = [
             e
             for e in get_sections_by_type(data, "wireless", "wifi-iface")
             if e["data"].get("device") == device_section["name"]
-            and not e["anonymous"]
-            and e["name"].startswith("guest_iface_")
+               and not e["anonymous"]
+               and e["name"].startswith("guest_iface_")
         ]
         guest_interface = guest_interfaces[0] if guest_interfaces else None
 
@@ -331,12 +331,12 @@ class WifiUci:
         return {"devices": devices}
 
     def _update_wifi(
-        self,
-        backend: UciBackend,
-        settings,
-        device_section,
-        interface_section,
-        guest_interface_section,
+            self,
+            backend: UciBackend,
+            settings,
+            device_section,
+            interface_section,
+            guest_interface_section,
     ) -> typing.Optional[bool]:
         """
         :param backend: instance of UciBackend
@@ -426,11 +426,11 @@ class WifiUci:
         backend.del_option("wireless", device, "hwmode", fail_on_error=False)
 
     def _set_wifi_encryption(
-        self,
-        backend: UciBackend,
-        if_name: str,
-        wifi_encryption: str,
-        ieee80211w_disabled: bool
+            self,
+            backend: UciBackend,
+            if_name: str,
+            wifi_encryption: str,
+            ieee80211w_disabled: bool
     ) -> None:
         """Set wifi encryption mode and its related options
         :param backend: instance of UciBackend
@@ -497,7 +497,7 @@ class WifiUci:
                     )
 
                     if self._update_wifi(
-                        backend, device, device_section, interface, guest_interface
+                            backend, device, device_section, interface, guest_interface
                     ):
                         enable_guest_network = True
 
@@ -557,3 +557,85 @@ class WifiCmds(BaseCmdLine):
             return False
 
         return True
+
+
+class WifiScanCommands(AsyncMultipleCommands):
+    def scan_status(self, process_id):
+        """ Get the status of some scan
+        :param process_id: test process identifier
+        :type process_id: str
+        :returns: data about test process
+        :rtype: dict
+        """
+
+        with self.lock.readlock:
+            if process_id not in self.processes:
+                return {"status": "not_found"}
+            process_data = self.processes[process_id]
+
+        exited = process_data.get_exited()
+
+        data = process_data.get_data() if exited else {}
+
+        return {"status": "finished" if process_data.get_exited() else "running", "data": data}
+
+    def scan_trigger(
+            self, device_names, notify_function, exit_notify_function, reset_notify_function
+    ):
+        """ Executes connection test in asyncronous mode
+
+        This means that we don't wait for the test results. Only a test id is returned.
+        This id can be used in other queries.
+
+        :param device_names: device names for scan
+        :type device_names: [str]
+        :param notify_function: function which is used to send notifications back to client
+        :type notify_function: callable
+        :param exit_notify_function: function which is used to send notifications back to client
+                                     when test exits
+        :type exit_notify_function: callable
+        :param reset_notify_function: function which resets notification connection
+        :type reset_notify_function: callable
+        :returns: test id
+        :rtype: str
+
+        """
+        logger.debug("Starting connection test.")
+
+        # generate a notification handler
+        def handler_result(process_data, result):
+            res = {"scan_id": process_data.id, "data": result}
+            process_data.append_data(result)
+            notify_function(res)
+
+        # handler which will be called when the test exits
+        def handler_exit(process_data):
+            data = process_data.read_all_data()
+            exit_notify_function(
+                {"scan_id": process_data.id, "all_data": data, "success": process_data.get_retval() == 0}
+            )
+            logger.debug("Scan finished: (retval=%d)" % process_data.get_retval())
+
+        def format_ubus_args(ubus_object: str, method: str, data: typing.Optional[dict] = None):
+            cmd = [UbusBackend.UBUS_CMD, "call", ubus_object, method]
+            if data:
+                cmd.append(json.dumps(data))
+
+            return cmd
+
+        subprocess_infos = [
+            {
+                "id": i,
+                "args": format_ubus_args("iwinfo", "scan", {"device": device_name}),
+            } for i, device_name in enumerate(device_names)
+        ]
+
+        process_id = self.start_process(
+            subprocess_infos,
+            handler_result,
+            handler_exit,
+            reset_notify_function,
+        )
+
+        logger.debug("Scan started '%s'." % process_id)
+        return process_id

@@ -19,6 +19,7 @@
 
 import copy
 import logging
+import random
 
 from foris_controller.handler_base import BaseMockHandler
 from foris_controller.utils import logger_wrapper
@@ -211,6 +212,7 @@ _WIFI_NETWORKS = {
 
 class MockWifiHandler(Handler, BaseMockHandler):
     devices = copy.deepcopy(DEFAULT_CONFIG)
+    scan_id_set = set()
 
     @logger_wrapper(logger)
     def get_settings(self):
@@ -314,3 +316,36 @@ class MockWifiHandler(Handler, BaseMockHandler):
     def scan_device(self, data):
         """ Mocks return data fom wifi-scan. """
         return _WIFI_NETWORKS
+
+    @logger_wrapper(logger)
+    def scan_trigger(
+            self, device_names, notify_function, exit_notify_function, reset_notify_function
+    ):
+        """ Mocks triggering of the connection test
+        :param device_names:
+        :type device_names: str
+        :param notify_function: function to publish notifications
+        :type notify_function: callable
+        :param exit_notify_function: function for sending notification when a test finishes
+        :type exit_notify_function: callable
+        :param reset_notify_function: function to reconnect to the notification bus
+        :type reset_notify_function: callable
+        :returns: generated_test_id
+        :rtype: str
+        """
+        new_scan_id = "%032X" % random.randrange(2 ** 32)
+        MockWifiHandler.scan_id_set.add(new_scan_id)
+        return new_scan_id
+
+    @logger_wrapper(logger)
+    def scan_status(self, scan_id):
+        """ Mocks scan status
+        :param scan_id: id of the test to display
+        :type scan_id: str
+        :returns: connection test status + test data
+        :rtype: dict
+        """
+        if scan_id in MockWifiHandler.scan_id_set:
+            return {"status": "running", "data": _WIFI_NETWORKS}
+        else:
+            return {"status": "not_found"}

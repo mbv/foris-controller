@@ -59,14 +59,35 @@ class WifiModule(BaseModule):
             self.notify("reset")
         return {"result": res}
 
-    def action_scan_device(self, data):
-        """ Scan device for available wifi networks.
+    def action_scan_trigger(self, data):
+        """ Triggers scan
         :param data: {"device_name": "radio#"}.
-        :rtype: dict """
-        res = self.handler.scan_device(data)
-        return res
+        :type data: dict
+        :returns: dict containing test id {'scan_id': 'xxxx'}
+        :rtype: dict
+        """
+
+        # wrap action into notify function
+        def notify(msg):
+            self.notify("scan", msg)
+
+        def exit_notify(msg):
+            self.notify("scan_finished", msg)
+
+        return {
+            "scan_id": self.handler.scan_trigger(data["device_names"], notify, exit_notify, self.reset_notify)
+        }
+
+    def action_scan_status(self, data):
+        """ Reads connection test data
+        :param data: supposed to be {'test_id': 'xxxx'}
+        :type data: dict
+        :returns: data about connection test {'status': 'xxxx', 'data': {...}}
+        :rtype: dict
+        """
+        return self.handler.scan_status(data["scan_id"])
 
 
-@wrap_required_functions(["get_settings", "update_settings", "reset", "scan_device"])
+@wrap_required_functions(["get_settings", "update_settings", "reset", "scan_trigger", "scan_status"])
 class Handler(object):
     pass

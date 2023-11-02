@@ -43,7 +43,6 @@ logger = logging.getLogger(__name__)
 
 i2c_lock = RWLock(app_info["lock_backend"])
 
-
 CMDLINE_ROOT = os.environ.get("FORIS_CMDLINE_ROOT", "")
 logger.debug("Cmdline root is set to '%s'." % str(CMDLINE_ROOT))
 
@@ -366,7 +365,6 @@ class AsyncCommand(object):
         # and this code might be called from some handler thread which dies
         # after response is delivered
         def worker_thread(process_started):
-
             import logging
 
             logger = logging.getLogger(__name__)
@@ -382,6 +380,182 @@ class AsyncCommand(object):
                     args,
                     reset_notify_function,
                     handler_list,
+                    handler_exit,
+                    new_data_process,
+                    ready,
+                ),
+            )
+
+            with self.lock.writelock:
+                # test whether there is still space in buffer and remove midd
+                while len(self.processes) >= self.PROCESS_BUFFER:
+                    self.processes.popitem(False)
+                self.processes[new_data_process.id] = new_data_process
+
+            logger.debug("Starting async worker process.")
+            process.start()
+            ready.wait()
+            process_started.set()
+            process.join()
+            logger.debug("Async worker process finished.")
+
+        work_thread = threading.Thread(target=worker_thread, args=(process_started,))
+        work_thread.daemon = True
+        work_thread.start()
+
+        # Wait for the process
+        process_started.wait()
+
+        return new_data_process.id
+
+
+class AsyncMultipleCommands(object):
+    PROCESS_BUFFER = 20
+
+    manager = make_multiprocessing_manager()
+
+    def __init__(self):
+        self.lock = RWLock(app_info["lock_backend"])
+        self.processes = OrderedDict()
+
+    @staticmethod
+    def _command_worker(subprocess_infos, reset_notify, handler_result, handler_exit, process_data, ready):
+        """ Watch over an external command
+
+        :param subprocess_infos: arguments of the external commands
+        :type subprocess_infos: list[]
+        :param handler_result: handler(process_data)
+        :type handler_result: callable
+        :param handler_exit: handler which is called when process finishes - handler(process_data)
+        :type handler_exit: callable
+        :param reset_notify: function which is call to reset notification connection
+        :type reset_notify: callable
+        :param process_data: place where the data between the worker and the parent process
+                             are shared
+        :type process_data: AsyncProcessData
+        :param ready: event synchronization with parent process
+                      (tells parent process that it may continue)
+        """
+
+        logger.debug("Async process started.")
+
+        def format_args(subprocess_info):
+            # args[0] should be the script path
+            args = list(subprocess_info["args"])
+            args[0] = inject_cmdline_root(args[0])
+            subprocess_info["args"] = args
+            return subprocess_info
+
+        subprocess_formatted = list(map(format_args, subprocess_infos))
+
+        # exit when parent thread dies
+        prctl.set_pdeathsig(signal.SIGKILL)
+
+        # we are in another process so it might be necessary to repopen the connection
+        if reset_notify:
+            reset_notify()
+
+        # the parent may continue
+        ready.set()
+
+        for s in subprocess_formatted:
+            logger.debug("Starting monitored process: %s" % s["args"])
+
+        def preexec():
+            # make sure that program dies when parent is terminated
+            prctl.set_pdeathsig(signal.SIGKILL)
+            # for python programs this will force that stdout/stderr are flushed immediatelly
+            os.environ["PYTHONUNBUFFERED"] = "1"
+
+        def start_subprocess(subprocess_info):
+            process = subprocess.Popen(
+                subprocess_info["args"],
+                preexec_fn=preexec,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                close_fds=True,
+                universal_newlines=True,
+            )
+            subprocess_info["process"] = process
+            subprocess_info["handled"] = False
+            return subprocess_info
+
+        subprocesses = list(map(start_subprocess, subprocess_formatted))
+
+        def process_output(subprocess_info):
+            if subprocess_info["process"].returncode != 0:
+                logger.warning("Failure during ubus call: %s", subprocess_info["process"].stderr)
+                return
+
+            decoded = subprocess_info["process"].stdout.read()
+            if decoded:
+                result = json.loads(decoded)
+            else:
+                result = {}
+
+            handler_result(process_data, result)
+
+        def handle_subprocesses():
+            for s in subprocesses:
+                if s["process"].poll() is not None and not s["handled"]:
+                    process_output(s)
+                    s["handled"] = True
+
+        while any(map(lambda x: x["process"].poll() is None, subprocesses)):
+            handle_subprocesses()
+            pass
+
+        handle_subprocesses()
+
+        process_data.set_retval(max(map(lambda x: x["process"].returncode, subprocesses)))
+        process_data.set_exited()
+        if handler_exit:
+            handler_exit(process_data)
+        logger.debug("Async process finished.")
+
+    def start_process(self, subprocess_infos, handler_result, handler_exit, reset_notify_function):
+        """ Starts a thread which starts a process which monitors external command.
+
+        A new process is started because ubus doesn't allow you to listen and send notification
+        at once.
+
+
+        :param subprocess_infos:
+        :type subprocess_infos: []
+        :param handler_result: handler(process_data)
+        :type handler_result: callable
+        :param handler_exit: handler which is called when process finishes - handler(process_data)
+        :type handler_exit: callable
+        :param reset_notify_function: function which is call to reset notification connection
+        :type reset_notify_function: callable
+
+        :returns: A new process identifier
+        :rtype: str
+        """
+
+        new_data_process = AsyncProcessData(self.manager)
+        process_started = threading.Event()
+
+        # process is started in another thread
+        # prctl kills the child process when parent thread dies
+        # and this code might be called from some handler thread which dies
+        # after response is delivered
+        def worker_thread(process_started):
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            # Prepare ready event to wait for the process to be initialized
+            ready = multiprocessing.Event()
+            ready.clear()
+
+            logger.debug("Preparing async worker process.")
+            process = multiprocessing.Process(
+                target=AsyncMultipleCommands._command_worker,
+                args=(
+                    subprocess_infos,
+                    reset_notify_function,
+                    handler_result,
                     handler_exit,
                     new_data_process,
                     ready,

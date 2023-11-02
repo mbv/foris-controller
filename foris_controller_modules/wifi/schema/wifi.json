@@ -1,5 +1,28 @@
 {
     "definitions": {
+        "scan_id": {"type": "string"},
+        "scan_data": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "description": "available wifi service",
+                                "properties": {
+                                    "ssid": {"type": "string", "minLength": 1, "maxLength": 32},
+                                    "bssid": {"type": "string", "format": "macaddress"},
+                                    "mode": {"enum": ["Master", "Client"]},
+                                    "channel": {"type": "integer", "minimum": 1},
+                                    "encryption": {"$ref": "#/definitions/wifi_master_encryption"}
+
+                                },
+                                "requiredProperties": ["ssid", "bssid", "mode", "channel", "encryption"]
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+        },
         "SSID": {"type": "string", "minLength": 1, "maxLength": 32},
         "wifi_device_channel_number": {"type": "integer", "minimum": 1},
         "wifi_device_channel_11g_number": {"type": "integer", "minimum": 1, "maximum": 14},
@@ -420,13 +443,13 @@
                 "wpa": {
                     "type": "array",
                     "items":{
-                        "type":"integer", "minimum":1, "maximum":2
+                        "type":"integer", "minimum":1, "maximum":3
                     }
                 },
                 "authentication": {
                     "type": "array",
                     "items": {
-                        "enum": ["psk"]
+                        "enum": ["psk", "sae", "802.1x"]
                     }
                 },
                 "ciphers": {
@@ -564,50 +587,119 @@
             "additionalProperties": false
         },
         {
-            "description": "request to scan avaialable networks",
+            "description": "request to trigger scan avaialable networks",
             "properties": {
                 "module": {"enum": ["wifi"]},
                 "kind": {"enum": ["request"]},
-                "action": {"enum": ["scan_device"]},
+                "action": {"enum": ["scan_trigger"]},
                 "data": {
                     "type": "object",
                     "properties": {
-                        "device_name": {"type": "string"}
+                        "device_names": {
+                            "type": "array",
+                             "items": {
+                                "enum": ["radio0", "radio1"]
+                            }
+                        }
                     },
-                    "required": ["device_name"],
+                    "required": ["device_names"],
                     "additionalProperties": false
                 }
             },
             "additionalProperties": false
         },
         {
-            "description": "reply with available networks",
+            "description": "trigger scan reply",
             "properties": {
                 "module": {"enum": ["wifi"]},
                 "kind": {"enum": ["reply"]},
-                "action": {"enum": ["scan_device"]},
+                "action": {"enum": ["scan_trigger"]},
                 "data": {
                     "type": "object",
                     "properties": {
-                        "results": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "description": "available wifi service",
-                                "properties": {
-                                    "ssid": {"type": "string", "minLength": 1, "maxLength": 32},
-                                    "bssid": {"type": "string", "format": "macaddress"},
-                                    "mode": {"enum": ["Master", "Client"]},
-                                    "channel": {"type": "integer", "minimum": 1},
-                                    "encryption": {"$ref": "#/definitions/wifi_master_encryption"}
-
-                                },
-                                "requiredProperties": ["ssid", "bssid", "mode", "channel", "encryption"]
-                            }
-                        }
+                        "scan_id": {"$ref": "#/definitions/scan_id"}
                     },
-                    "required": ["results"],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "required": ["scan_id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "scan notification",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["scan"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "scan_id": {"$ref": "#/definitions/scan_id"},
+                        "data": {"$ref": "#/definitions/scan_data"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["scan_id", "data"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "get status of scan request",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["scan_status"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "scan_id": {"$ref": "#/definitions/scan_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["scan_id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "get status of scan reply",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["scan_status"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"enum": ["not_found", "running", "finished"]},
+                        "data": {"$ref": "#/definitions/scan_data"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["status"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "scan finished notification",
+            "properties": {
+                "module": {"enum": ["wifi"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["scan_finished"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "scan_id": {"$ref": "#/definitions/scan_id"},
+                        "all_data": {
+                            "type": "array",
+                             "items": {"$ref": "#/definitions/scan_data"}
+                        },
+                        "success": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["scan_id"]
                 }
             },
             "additionalProperties": false,

@@ -21,7 +21,7 @@ import logging
 
 from foris_controller.handler_base import BaseOpenwrtHandler
 from foris_controller.utils import logger_wrapper
-from foris_controller_backends.wifi import WifiUci, WifiCmds
+from foris_controller_backends.wifi import WifiUci, WifiCmds, WifiScanCommands
 
 from .. import Handler
 
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 class OpenwrtWifiHandler(Handler, BaseOpenwrtHandler):
     uci = WifiUci()
     cmds = WifiCmds()
+    scanCmds = WifiScanCommands()
 
     @logger_wrapper(logger)
     def get_settings(self):
@@ -62,6 +63,28 @@ class OpenwrtWifiHandler(Handler, BaseOpenwrtHandler):
         return self.cmds.reset()
 
     @logger_wrapper(logger)
-    def scan_device(self, data):
+    def scan_trigger(self, device_names, notify_function, exit_notify_function, reset_notify_function):
+        """ Triggering of the scan for device name
+        :param device_names:
+        :type device_names: [str]
+        :param notify_function: function for sending notifications
+        :type notify_function: callable
+        :param exit_notify_function: function for sending notification when a test finishes
+        :type exit_notify_function: callable
+        :param reset_notify_function: function to reconnect to the notification bus
+        :type reset_notify_function: callable
+        :returns: generated_scan_id
+        :rtype: str
+        """
         """ Scans wifi device for networks """
-        return WifiUci.scan_device(**data)
+        return self.scanCmds.scan_trigger(device_names, notify_function, exit_notify_function, reset_notify_function)
+
+    @logger_wrapper(logger)
+    def scan_status(self, scan_id):
+        """ Connection test status
+        :param scan_id: id of the scan to display
+        :type scan_id: str
+        :returns: connection test status + test data
+        :rtype: dict
+        """
+        return self.scanCmds.scan_status(scan_id)
